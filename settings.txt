@@ -1,0 +1,6 @@
+sprzedawca: 'sprzedawca';
+firma-sprzedawcy: 'firma sprzedawcy';
+email: 'email';
+kod-pocztowy: 'adres pocztowy';
+adres: 'ulica';
+stawka-vat: '0.00';
