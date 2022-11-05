@@ -1,0 +1,7 @@
+sprzedawca: 'Sprzedawca';
+firma-sprzedawcy: 'Firma Sprzedawca';
+email: 'Email Sprzedawcy';
+kod-pocztowy: 'Adres Sprzedawcy';
+adres: 'Ulica Sprzedawcy';
+dostawa: '29.99';
+uwzglednij-dostawe: 'False';
