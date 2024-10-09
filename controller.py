@@ -2,13 +2,14 @@ import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import messagebox
 from tkinter.filedialog import asksaveasfilename
-from tkinter.messagebox import showerror
+from tkinter.messagebox import showerror, showinfo
 import os
 import distutils.util
 from decimal import Decimal
 import subprocess
 import sys
 import platform
+import datetime
 from dataclasses import dataclass
 
 import openpyxl
@@ -222,6 +223,69 @@ class UpdateProductWindow(tk.Toplevel):
 		self.destroy()
 
 
+class ExcelProduct:
+	""" 
+	Reprezentuje produkt wyciągnięty z arkusza excela
+	"""
+
+	def __init__(self, skoroszyt, wiersz):
+		""" Wyciąga dane z wiersza i sprawdza ich poprawnośc """
+
+		self.nazwa = skoroszyt[f"B{2 + wiersz}"].value
+		self.typ = skoroszyt[f"C{2 + wiersz}"].value
+		self.cena = skoroszyt[f"D{2 + wiersz}"].value
+		self.dostepnosc = skoroszyt[f"E{2 + wiersz}"].value
+		self.vat = skoroszyt[f"F{2 + wiersz}"].value
+
+		if not self.typ: self.typ = "brak"
+
+
+	def is_invalid(self):
+		""" Sprawdza czy wszystkie pobrane dane są poprawne """
+
+		try:
+			self.nazwa = str(self.nazwa)
+
+		except ValueError:
+			return f"Błąd: Wprowadzone dane nie są poprawne(nazwa w produkcie {self.nazwa} nie jest tekstem)."
+
+		try:
+			self.cena = float(self.cena)
+
+		except ValueError:
+			return f"Błąd: Wprowadzone dane nie są poprawne(cena w produkcie {self.nazwa} nie jest liczbą)."
+
+		except TypeError:
+			if isinstance(self.cena, datetime.datetime):
+				return f"Błąd: Wprowadzone dane nie są poprawne(cena w produkcie {self.nazwa} została podana jako data. Należy zmienić ją na prawidłową liczbę)."
+
+		try:
+			self.vat = float(self.vat)
+
+		except ValueError:
+			return f"Błąd: Wprowadzone dane nie są poprawne(stawka vat w produkcie {self.nazwa} nie jest liczbą)."
+
+		except TypeError:
+			if isinstance(self.cena, datetime.datetime):
+				return f"Błąd: Wprowadzone dane nie są poprawne(cena w produkcie {self.nazwa} została podana jako data. Należy zmienić ją na prawidłową liczbę)."
+
+		try:
+			self.dostepnosc = bool(self.dostepnosc)
+
+		except ValueError:
+			return f"Błąd: Wprowadzone dane nie są poprawne(stan produktu {self.nazwa} nie może być rozpoznany jako wartość prawda/fałsz)."
+
+
+		if self.cena < 0:
+			return f"Błąd: Wprowadzone dane nie są poprawne(cena w produkcie {self.nazwa} jest ujemna)."
+
+		elif self.vat < 0:
+			return f"Błąd: Wprowadzone dane nie są poprawne(stawka vat w produkcie {self.nazwa} jest ujemna)."
+
+
+		return 0
+
+
 class Appender(tk.Toplevel):
 	""" 
 	Klasa odpowiedzialna za wprowadzanie danych z arkusza .xlsx 
@@ -293,38 +357,46 @@ class Appender(tk.Toplevel):
 			wiersze = int(self.wiersz_entry.get())
 
 		except ValueError:
-			showerror(title="Błąd", message="Błąd: Wprowadzone dane nie są poprawne.")
+			showerror(title="Błąd", message="Błąd: Wprowadzone dane nie są poprawne.", parent = self)
 			return
 
 		# Wczytywanie akrusza
 		try:
-			arkusz = openpyxl.load_workbook(filename=plik)
+			arkusz = openpyxl.load_workbook(filename=plik, data_only=True)
 			skoroszyt = arkusz.active
 
 		except Exception:
-			showerror(title="Błąd", message="Błąd: Podany akrusz nie istnieje.")
+			showerror(title="Błąd", message="Błąd: Podany akrusz nie istnieje.", parent = self)
 			return
 
 		# Dodawanie produktów 
 		if skoroszyt[f"B2"].value == None:
-			showerror(title="Błąd", message="Błąd: Podany arkusz jest nieprawidłowy.")
+			showerror(title="Błąd", message="Błąd: Podany arkusz jest nieprawidłowy.", parent = self)
 			return
 
 		for wiersz in range(wiersze):
 			if skoroszyt[f"B{2 + wiersz}"].value == None:
-				showerror(title="Błąd", message="Błąd: Akrusz nie posiada podanej liczb wierszy informacji.")
+				showerror(title="Błąd", message="Błąd: Akrusz nie posiada podanej liczb wierszy informacji.", parent = self)
 				return
 
 		for wiersz in range(wiersze):
+			new_product = ExcelProduct(skoroszyt, wiersz)
+
+			if error := new_product.is_invalid():
+				showerror(title="Błąd", message=error, parent = self)
+				return
+
 			Model.add_product(
-				skoroszyt[f"B{2 + wiersz}"].value, 
-				skoroszyt[f"C{2 + wiersz}"].value, 
-				skoroszyt[f"D{2 + wiersz}"].value, 
-				distutils.util.strtobool(skoroszyt[f"E{2 + wiersz}"].value), 
-				skoroszyt[f"F{2 + wiersz}"].value
+				new_product.nazwa, 
+				new_product.typ, 
+				new_product.cena, 
+				new_product.dostepnosc, 
+				new_product.vat
 			)
 
-		self.controller.reload_treeview()
+		self.controller.clear_treeview()
+		self.controller.load_treeview()
+		showinfo(title="Suckes", message="Operacja została zakończona powodzeniem.", parent = self)
 		self.destroy()
 
 
