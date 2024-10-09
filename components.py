@@ -197,17 +197,18 @@ class PathEntry(LabeledEntry):
 		self.button = tk.Button(self, text="Szukaj", command=self.__open)
 		self.button.grid(row=0, column=2)
 
-
 	def __open(self) -> None:
 		""" 
 		Przekazuje na wejście wyszukaną
 		w eksploratorze scieżkę.
 		"""
+
 		path = askopenfilename(
 			filetypes = (
 				("Arkusz programu Excel","*.xlsx*"),
 				("Wszystkie pliki","*.*")
-			)
+			), 
+			parent = self.master
 		)
 
 		if platform.system() == "Windows":
@@ -216,6 +217,7 @@ class PathEntry(LabeledEntry):
 		else:
 			path =  path.replace("\\", "/")
 
+		self.entry.delete(0, tk.END)
 		self.entry.insert(tk.END, path)
 
 
