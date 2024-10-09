@@ -1,6 +1,15 @@
 import sqlite3
 
 
+def _adjust_string_to_sql(string_):
+	""" Ensures that given string with be SQL compatible """
+
+	string_ = string_.replace('''"''', '''""''')
+	string_ = string_.replace("""'""", """''""")
+
+	return string_
+
+
 class Model:
 	""" Klasa odpowiedzialna za obsługę danych """
 
@@ -37,7 +46,7 @@ class Model:
 			cursor = conn.cursor()
 
 			cursor.execute(
-				f"""INSERT INTO produkty VALUES (NULL, "{nazwa}", "{typ}", {cena}, {stan}, {vat})"""
+				f"""INSERT INTO produkty VALUES (NULL, "{_adjust_string_to_sql(nazwa)}", "{_adjust_string_to_sql(typ)}", {cena}, {stan}, {vat})"""
 			)
 			conn.commit()
 
@@ -83,7 +92,7 @@ class Model:
 			cursor = conn.cursor()
 
 			cursor.execute(
-				f"""SELECT id FROM produkty WHERE nazwa=="{nazwa}" """
+				f"""SELECT id FROM produkty WHERE nazwa=="{_adjust_string_to_sql(nazwa)}" """
 			)
 			conn.commit()
 
@@ -97,7 +106,7 @@ class Model:
 			cursor = conn.cursor()
 
 			cursor.execute(
-				f"""SELECT cena FROM produkty WHERE nazwa=="{nazwa}" """
+				f"""SELECT cena FROM produkty WHERE nazwa=="{_adjust_string_to_sql(nazwa)}" """
 			)
 			conn.commit()
 		
@@ -111,7 +120,7 @@ class Model:
 			cursor = conn.cursor()
 
 			cursor.execute(
-				f"""SELECT vat FROM produkty WHERE nazwa=="{nazwa}" """
+				f"""SELECT vat FROM produkty WHERE nazwa=="{_adjust_string_to_sql(nazwa)}" """
 			)
 			conn.commit()
 		
