@@ -299,6 +299,7 @@ class Appender(tk.Toplevel):
 		self.resizable(False, False)
 
 		self.controller = controller
+		self.perform_reload = False
 
 		# Definicje Listenerów
 		def tab_changed(e):
@@ -320,6 +321,8 @@ class Appender(tk.Toplevel):
 
 		xlsx_caption = tk.Label(excel_panel, text="Importuj dane z arkusza")
 
+		self.excel_progress_panel = tk.Frame(excel_panel)
+
 		# Panel zatwierdzenia
 		panel_zatwierdzania = tk.LabelFrame(self)
 
@@ -332,7 +335,6 @@ class Appender(tk.Toplevel):
 		panel_zatwierdzania.pack(side=tk.BOTTOM, fill=tk.X, padx=4, pady=4)
 		
 
-
 		db_panel = tk.Frame(notebook)
 
 		# Dodawanie kart do notebooka
@@ -340,6 +342,8 @@ class Appender(tk.Toplevel):
 		piktk.Separator(excel_panel).pack(fill=tk.X, padx=4, pady=4)
 		self.xlsx_path.pack(side=tk.TOP, anchor=tk.W, padx=4, pady=4)
 		self.wiersz_entry.pack(side=tk.TOP, anchor=tk.W, padx=4, pady=4)
+		self.excel_progress_panel.pack(side=tk.TOP, fill=tk.X, pady=(16, 0), padx=4)
+		#self.set_progressbar(35)
 		excel_panel.pack(fill=tk.BOTH, expand=1)
 
 		notebook.add(excel_panel, text="          .xlsx")
@@ -347,9 +351,17 @@ class Appender(tk.Toplevel):
 		notebook.tab(1, state="disabled")
 
 		notebook.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
-
 		self.mainloop()
 
+
+	def reload_treeview(self):
+		""" Reloads the product view """
+
+		self.controller.clear_treeview()
+		self.controller.load_treeview()
+		showinfo(title="Suckes", message="Operacja została zakończona powodzeniem.", parent = self)
+		self.destroy()
+		
 
 	def importuj_arkusz(self):
 		try:
@@ -379,6 +391,31 @@ class Appender(tk.Toplevel):
 				showerror(title="Błąd", message="Błąd: Akrusz nie posiada podanej liczb wierszy informacji.", parent = self)
 				return
 
+		if wiersze > 25:
+			self.set_progressbar(wiersze)
+		
+		
+		import threading
+		thr = threading.Thread(target=self.load_products, args=(skoroszyt, wiersze))
+		thr.start()
+
+
+	def set_progressbar(self, wiersze):
+		self.progress = ttk.Progressbar(self.excel_progress_panel)
+		self.status_text = tk.Label(self.excel_progress_panel, text="Status...")
+
+		self.progress.pack(fill=tk.X, pady=4, padx=4)
+		self.status_text.pack(side=tk.TOP, padx=4, pady=4, anchor=tk.W)
+
+
+	def truncate_name(self, string, limit):
+		""" Przycina podanego stringa jeżeli jest dłuższy niż podany limit. """
+		return (string[:(limit - 2)] + '..') if len(string) > (limit - 2) else string
+
+
+	def load_products(self, skoroszyt, wiersze):
+		step = 100 / wiersze
+
 		for wiersz in range(wiersze):
 			new_product = ExcelProduct(skoroszyt, wiersz)
 
@@ -386,6 +423,7 @@ class Appender(tk.Toplevel):
 				showerror(title="Błąd", message=error, parent = self)
 				return
 
+			self.status_text.config(text = f"Importing {self.truncate_name(new_product.nazwa, 50)}...")
 			Model.add_product(
 				new_product.nazwa, 
 				new_product.typ, 
@@ -393,11 +431,12 @@ class Appender(tk.Toplevel):
 				new_product.dostepnosc, 
 				new_product.vat
 			)
+			self.progress.step(step)
 
-		self.controller.clear_treeview()
-		self.controller.load_treeview()
-		showinfo(title="Suckes", message="Operacja została zakończona powodzeniem.", parent = self)
-		self.destroy()
+		self.progress['value'] = 100
+		self.status_text.config(text = f"Done.")
+
+		self.after(0, self.reload_treeview)
 
 
 @dataclass
