@@ -342,3 +342,125 @@ class ProgressToplevel():
 	def truncate_name(self, string, limit):
 		""" Przycina podanego stringa jeżeli jest dłuższy niż podany limit. """
 		return (string[:(limit - 2)] + '..') if len(string) > (limit - 2) else string
+
+
+
+
+class _AutocompletionLabel(tk.Label):
+	""" A label displaying what autocompletion hints """
+
+	def __init__(self, *args, **kwagrs):
+		super().__init__(*args, **kwagrs)
+
+		self.bind("<Button-1>", self.left_click)
+
+
+	def left_click(self, e):
+		self.master.belongs_to.delete(0, tk.END)
+		self.master.belongs_to.insert(0, self["text"])
+		self.master.belongs_to.destroy_popups()
+
+
+class AutoCombobox(ttk.Combobox):# <-- later change to a more broad Autocompletion class for all input serving widgets
+	""" A combobox with autocompletion feathures """
+
+	def __init__(self, master, root_window):
+		super().__init__(master)
+		self.bind("<KeyRelease>", lambda e: self.display_autocompletions())
+		self.bind("<FocusOut>", lambda e: self.destroy_popups())
+		self.bind("<FocusIn>", lambda e: self.display_autocompletions())
+
+		self.popups = []
+		self.root_window = root_window
+		self.previous_autocompletions = None
+
+
+	def destroy_popups(self):
+		""" 
+		Responsible for destroying all the popups with 
+		autocompletion hints 
+		"""
+
+		self.previous_autocompletions = None
+
+		for elem in self.popups:
+			elem.destroy()
+
+
+	def truncate_name(self, string, limit):
+		""" Przycina podanego stringa jeżeli jest dłuższy niż podany limit. """
+		return (string[:(limit - 2)] + '..') if len(string) > (limit - 2) else string
+
+
+	def display_autocompletions(self):
+			""" Displays matching autompletions bellow of the Combobox widget """
+			
+			def get_matching_autocompletions(inputed_text):
+				""" Returns autocompletions matching with given text """
+				matching_autocompletions = []
+
+				# Zwróć, jeśli informacja zaczyna się tak jak inputed_text
+				for hint in self['values']:
+					if hint.startswith(inputed_text):
+						matching_autocompletions.append(hint)
+
+				return matching_autocompletions
+
+			def insert_autocompletion(autocompletions):
+				""" Inserts the top autocompletion into the combobox """
+
+				self.delete(0, tk.END)
+				self.insert(0, autocompletions[0])
+
+				self.destroy_popups()
+
+			# Getting the autocompletions
+			inputed_text = self.get()
+			if not inputed_text: 
+				self.destroy_popups()
+				return
+
+			autocompletions = get_matching_autocompletions(inputed_text)
+			if not len(autocompletions):
+				self.destroy_popups()
+				return
+
+			if self.previous_autocompletions == autocompletions:
+				return
+
+			self.bind("<Tab>", lambda e: insert_autocompletion(autocompletions))
+
+			# Positioning the space for autocompletions right
+			popup = tk.Toplevel()
+			popup.attributes('-topmost',True)
+			popup.belongs_to = self
+
+			x = self.winfo_rootx()
+			y = self.winfo_rooty() + self.winfo_height()
+	
+			popup.wm_overrideredirect(True)
+			popup.wm_geometry("+%d+%d" % (x, y))
+
+			self.destroy_popups()
+
+			# Placing the autocompletions
+			total_height = 0
+			counter = 0
+
+			for autocompletion in autocompletions:
+				hint_label = tk.Label(
+					popup, text = self.truncate_name(autocompletion, 20), anchor = 'w', bg="white"
+				)
+				hint_label.pack(fill=tk.X)
+				popup.update()
+				total_height += hint_label.winfo_height()
+				counter += 1
+				if counter == 1: # <-- display max. 3 autocompletion hints
+					break
+
+			popup.geometry(f"{self.winfo_width()}x{total_height}")
+			self.root_window.moving_parts.append(popup)
+			self.popups.append(popup)
+			self.previous_autocompletions = autocompletions
+
+				

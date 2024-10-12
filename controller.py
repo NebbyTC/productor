@@ -2,7 +2,7 @@ import tkinter as tk
 import tkinter.ttk as ttk
 from tkinter import messagebox
 from tkinter.filedialog import asksaveasfilename
-from tkinter.messagebox import showerror, showinfo
+from tkinter.messagebox import showerror, showinfo, askquestion
 import os
 import distutils.util
 from decimal import Decimal
@@ -643,6 +643,23 @@ class Controller:
 		user_input = UpdateProductWindow(self, _id, wartosci[0], wartosci[1], wartosci[2], wartosci[3])
 
 
+	def remove_from_invoice(self):
+		""" Usuwa z faktury wybrany przez użytkownika wpis """
+
+		remove_product = askquestion("Usuń produkt", "Czy na pewno chcesz usunąć ten produkt z faktury?")
+
+		if remove_product:
+			selected_item = self.view.kupione_produkty.selection()[0]
+			self.view.kupione_produkty.delete(selected_item)
+
+
+	def clear_invoice_form(self):
+		""" Czyści formularz faktury, aby użytkownik mógł wystawić kolejną """
+
+		#showinfo(title="Suckes", message="Operacja została zakończona powodzeniem.")
+		self.view.kupione_produkty.delete(*self.view.kupione_produkty.get_children())
+
+
 	def load_settings(self):
 		""" Wczytuje ustawienia z pliku ustawień """
 		
@@ -752,4 +769,6 @@ class Controller:
 
 		plik = Faktura(nazwa, info, bool(self.view.include_vat.get()))
 		plik.build()
+
+		self.clear_invoice_form()
 			
