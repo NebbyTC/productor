@@ -9,6 +9,7 @@ from decimal import Decimal
 import subprocess
 import sys
 import platform
+import threading
 import datetime
 from dataclasses import dataclass
 
@@ -286,7 +287,7 @@ class ExcelProduct:
 		return 0
 
 
-class Appender(tk.Toplevel):
+class Appender(tk.Toplevel, piktk.ProgressToplevel):
 	""" 
 	Klasa odpowiedzialna za wprowadzanie danych z arkusza .xlsx 
 	"""
@@ -294,7 +295,7 @@ class Appender(tk.Toplevel):
 	def __init__(self, controller):
 		super().__init__(controller.view)
 		self.geometry("500x400")
-		self.title("Zmień ustawienia")
+		self.title("Importuj dane")
 		self.group(controller.view)
 		self.resizable(False, False)
 
@@ -391,26 +392,10 @@ class Appender(tk.Toplevel):
 				showerror(title="Błąd", message="Błąd: Akrusz nie posiada podanej liczb wierszy informacji.", parent = self)
 				return
 
-		if wiersze > 25:
-			self.set_progressbar(wiersze)
+		self.set_progressbar(wiersze)
 		
-		
-		import threading
 		thr = threading.Thread(target=self.load_products, args=(skoroszyt, wiersze))
 		thr.start()
-
-
-	def set_progressbar(self, wiersze):
-		self.progress = ttk.Progressbar(self.excel_progress_panel)
-		self.status_text = tk.Label(self.excel_progress_panel, text="Status...")
-
-		self.progress.pack(fill=tk.X, pady=4, padx=4)
-		self.status_text.pack(side=tk.TOP, padx=4, pady=4, anchor=tk.W)
-
-
-	def truncate_name(self, string, limit):
-		""" Przycina podanego stringa jeżeli jest dłuższy niż podany limit. """
-		return (string[:(limit - 2)] + '..') if len(string) > (limit - 2) else string
 
 
 	def load_products(self, skoroszyt, wiersze):
@@ -437,6 +422,119 @@ class Appender(tk.Toplevel):
 		self.status_text.config(text = f"Done.")
 
 		self.after(0, self.reload_treeview)
+
+
+class Exporter(tk.Toplevel, piktk.ProgressToplevel):
+	""" 
+	Klasa odpowiedzialna za eksportowanie danych 
+	produktów do arkusza prgoramu Excel.
+	"""
+
+	def __init__(self, controller):
+		super().__init__(controller.view)
+		self.geometry("500x400")
+		self.title("Eksportuj dane")
+		self.group(controller.view)
+		self.resizable(False, False)
+
+		self.controller = controller
+
+		# Definicje Listenerów
+		def tab_changed(e):
+			self.focus()
+
+		# Definicje stylów
+		style = ttk.Style(self)
+		style.configure('lefttab.TNotebook', tabposition='wn')
+
+		# Definicje widgetów
+		notebook = ttk.Notebook(self, style='lefttab.TNotebook')
+		notebook.bind('<<NotebookTabChanged>>', tab_changed)
+
+		# Panele
+		excel_panel = tk.Frame(notebook)
+
+		self.xlsx_path = piktk.PathEntry(excel_panel, caption="Scieżka do pliku")
+		self.xlsx_path.mode = piktk.SAVE
+
+		xlsx_caption = tk.Label(excel_panel, text="Eksportuj produkty do akrusza")
+
+		self.excel_progress_panel = tk.Frame(excel_panel)
+
+		# Panel zatwierdzenia
+		panel_zatwierdzania = tk.LabelFrame(self)
+
+		submit_button = tk.Button(panel_zatwierdzania, text="Zapisz", command=self.export_bridge)
+		cancel_button = tk.Button(panel_zatwierdzania, text="Anuluj", command=self.destroy)
+
+		submit_button.pack(side=tk.RIGHT, padx=4, pady=4)
+		cancel_button.pack(side=tk.RIGHT, padx=4, pady=4)
+
+		panel_zatwierdzania.pack(side=tk.BOTTOM, fill=tk.X, padx=4, pady=4)
+		
+
+		db_panel = tk.Frame(notebook)
+
+		# Dodawanie kart do notebooka
+		xlsx_caption.pack(side=tk.TOP, anchor=tk.W, padx=4, pady=4)
+		piktk.Separator(excel_panel).pack(fill=tk.X, padx=4, pady=4)
+		self.xlsx_path.pack(side=tk.TOP, anchor=tk.W, padx=4, pady=4)
+		self.excel_progress_panel.pack(side=tk.TOP, fill=tk.X, pady=(16, 0), padx=4)
+		excel_panel.pack(fill=tk.BOTH, expand=1)
+
+		notebook.add(excel_panel, text="          .xlsx")
+
+		notebook.pack(fill=tk.BOTH, expand=True, padx=4, pady=4)
+		self.mainloop()
+
+
+	def export_bridge(self):
+		products = Model.get_products()
+
+		self.set_progressbar(len(products))
+
+		thr = threading.Thread(target=self.__export, args=(products,))
+		thr.start()
+
+
+	def __export(self, products):
+		""" Saves the product data in a .xlsx file """
+
+		# Creating new .xlsx file
+		path = self.xlsx_path.get()
+		wb = openpyxl.Workbook()
+		wb.save(path)
+
+		# Opening new .xlsx file 
+		arkusz = openpyxl.load_workbook(filename=path, data_only=True)
+		skoroszyt = arkusz.active
+
+		# Exporting products
+		step = 100 / len(products)
+
+		for product in products:
+			id_ = product[0]
+			name = product[1]
+			type_ = product[2]
+			price = product[3]
+			is_avaliable = product[4]
+			vat = product[5]
+
+			skoroszyt.cell(row = id_, column = 1).value = name
+			skoroszyt.cell(row = id_, column = 2).value = type_
+			skoroszyt.cell(row = id_, column = 3).value = price
+			skoroszyt.cell(row = id_, column = 4).value = is_avaliable
+			skoroszyt.cell(row = id_, column = 5).value = vat
+
+			self.status_text.config(text = f"Importing {self.truncate_name(name, 50)}...")
+			self.progress.step(step)
+
+		arkusz.save(path)
+		self.status_text.config(text = f"Done")
+		self.progress['value'] = 100
+
+		showinfo(title="Suckes", message="Operacja została zakończona powodzeniem.", parent = self)
+		self.destroy()
 
 
 @dataclass
@@ -475,6 +573,11 @@ class Controller:
 	def start_appender(self):
 		""" Metoda uruchamiająca program imprortu z arkusza xlsx """
 		Appender(self)
+
+
+	def start_exporter(self):
+		""" Metoda uruchamiająca okienko eksportu produktów do arkusza """
+		Exporter(self)
 
 		
 	def load_treeview(self):

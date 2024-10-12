@@ -1,6 +1,6 @@
 import tkinter as tk
 import tkinter.ttk as ttk
-from tkinter.filedialog import askopenfilename
+from tkinter.filedialog import askopenfilename, asksaveasfilename
 import platform
 from typing import Union
 
@@ -179,10 +179,13 @@ class Checkbox(tk.Checkbutton):
 		self.value.set(int(value))
 
 
+OPEN = "pik.open"
+SAVE = "pik.save"
+
 class PathEntry(LabeledEntry):
 	""" Komponent wejścia z wyszukiwarką plików """
 
-	def __init__(self, master: tk.Frame, caption: str):
+	def __init__(self, master: tk.Frame, caption: str, mode: str = OPEN):
 		""" 
 		Tworzy komponent i dziedziczy 
 
@@ -194,8 +197,16 @@ class PathEntry(LabeledEntry):
 		"""
 		super().__init__(master, caption)
 
+		self.mode = mode
+		self.defualt_extension = ".xlsx"
+		self.extensions = (
+			("Arkusz programu Excel","*.xlsx"),
+			("Wszystkie pliki","*.*")
+		)
+
 		self.button = tk.Button(self, text="Szukaj", command=self.__open)
 		self.button.grid(row=0, column=2)
+
 
 	def __open(self) -> None:
 		""" 
@@ -203,13 +214,17 @@ class PathEntry(LabeledEntry):
 		w eksploratorze scieżkę.
 		"""
 
-		path = askopenfilename(
-			filetypes = (
-				("Arkusz programu Excel","*.xlsx*"),
-				("Wszystkie pliki","*.*")
-			), 
-			parent = self.master
-		)
+		if self.mode == OPEN:
+			path = askopenfilename(
+				filetypes = self.extensions,
+				parent = self.master
+			)
+		elif self.mode == SAVE:
+			path = asksaveasfilename(
+				filetypes = self.extensions,
+				defaultextension = self.defualt_extension,
+				parent = self.master
+			)
 
 		if platform.system() == "Windows":
 			path = path.replace("/", "\\")
@@ -306,3 +321,24 @@ class LabeledCombobox(tk.Frame):
 
 		else:
 			raise ValueError("[ProductorInternal] Argument 'option' nie jest typu 'str' ani 'int'.")
+
+
+class ProgressToplevel():
+	""" 
+	Klasa wzór okna, które realizuje w tle
+	funkcjonalność ładowania
+	"""
+
+
+	def set_progressbar(self, wiersze):
+		""" Ustawia pasek ładowania """
+		self.progress = ttk.Progressbar(self.excel_progress_panel)
+		self.status_text = tk.Label(self.excel_progress_panel, text="Status...")
+
+		self.progress.pack(fill=tk.X, pady=4, padx=4)
+		self.status_text.pack(side=tk.TOP, padx=4, pady=4, anchor=tk.W)
+
+
+	def truncate_name(self, string, limit):
+		""" Przycina podanego stringa jeżeli jest dłuższy niż podany limit. """
+		return (string[:(limit - 2)] + '..') if len(string) > (limit - 2) else string

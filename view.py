@@ -107,6 +107,11 @@ class Gui(OKNO):
 		self.import_menu.add_command(label="Importuj arkusz excela", command=lambda: self.controller.start_appender())
 		self.menubar.add_cascade(label="Importuj", menu=self.import_menu)
 
+		# Export menu
+		self.export_menu = tk.Menu(tearoff=False)
+		self.export_menu.add_command(label="Exprtuj produkty do arkuszu", command=lambda: self.controller.start_exporter())
+		self.menubar.add_cascade(label="Eksportuj", menu=self.export_menu)
+
 		# Ustawienia menu
 		self.menubar.add_command(label="Ustawienia", command=self.controller.change_settings)
 
